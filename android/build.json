@@ -1,0 +1,15 @@
+{
+    "emulator": "kytyps5",
+    "name": "Android platform support",
+    "notes": "KytyPS5 expanded by Android platform support.",
+    "hostSeams": ["window", "audio", "pad-1"],
+    "env": {},
+    "bootCheckpoints": [
+        { "pattern": "Initialized: Config", "description": "Starting KytyPS5…" },
+        { "pattern": "WindowCreate():", "description": "Preparing the display…" },
+        { "pattern": "Vulkan device:", "description": "Preparing the graphics…" },
+        { "pattern": "Title ID:", "description": "Reading the game…", "gameStarts": true },
+        { "pattern": "Loading: ", "description": "Loading modules…" },
+        { "pattern": "--- Execute: Main", "description": "Starting the game…" }
+    ]
+}
