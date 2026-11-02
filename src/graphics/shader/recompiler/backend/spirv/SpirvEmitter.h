@@ -17,6 +17,8 @@ struct Profile {
 	uint32_t device_clock_period_ps = 0;
 	// Storage buffer elements past the descriptor range, to the byte, read zero and drop writes.
 	bool robust_buffer_access = false;
+	// MinLod image operands (shaderResourceMinLod). Without them a sample's LOD clamp is dropped.
+	bool min_lod = true;
 };
 
 inline constexpr Profile DefaultProfile {};
