@@ -5,6 +5,7 @@
 #else
 
 #include "common/assert.h"
+#include "common/hostAddressSpace.h"
 #include "common/virtualMemory.h"
 
 #include <atomic>
@@ -111,8 +112,12 @@ static void* map_anonymous(uintptr_t addr, size_t size, int protect, int flags) 
 	}
 
 #ifdef KYTY_FIXED_NOREPLACE
-	const auto step = align_up_to(size, LOW_ARENA_GRAIN);
-	for (int attempt = 0; attempt < 256; attempt++) {
+	// A host whose whole user address space sits below the arena (39-bit arm64 on the Android
+	// host) is already inside the GPU page tracker's 1<<40 window, and every probe here would fail
+	// past its ceiling: let the kernel choose instead.
+	const auto limit = HostUserAddressLimit();
+	const auto step  = align_up_to(size, LOW_ARENA_GRAIN);
+	for (int attempt = 0; attempt < 256 && (limit == 0 || limit > LOW_ARENA_LIMIT); attempt++) {
 		const auto top = g_low_arena_next.fetch_sub(step, std::memory_order_relaxed);
 		if (top < step || top - step < LOW_ARENA_FLOOR) {
 			break;

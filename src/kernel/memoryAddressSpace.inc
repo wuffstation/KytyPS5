@@ -10,7 +10,32 @@ static constexpr uint64_t HOST_USER_MIN            = 0x7000000000ull;
 static constexpr uint64_t HOST_SYSTEM_RESERVED_MAX = 0x0fffffffffull;
 static constexpr uint64_t HOST_USER_MIN            = 0x1000000000ull;
 #endif
-static constexpr uint64_t HOST_USER_MAX = 0xfbffffffffull;
+static constexpr uint64_t HOST_USER_MAX_CLASSIC = 0xfbffffffffull;
+
+// What a host narrower than the classic layout keeps for itself above the guest user window.
+// FEXCore's code buffers, the Vulkan driver, bionic's heap and the Android linker all come from
+// mmap's top-down search, and ReserveGuestRegions would otherwise claim every free gap below the
+// ceiling and starve them.
+static constexpr uint64_t HOST_TOP_RESERVE_MIN = 0x2000000000ull; // 128 GiB
+
+// The end of the user window, chosen once from the host's measured ceiling. Every desktop host keeps
+// the classic 0xFBFFFFFFFF, bit for bit; a 39-bit host (512 GiB) ends it at 384 GiB.
+static uint64_t ComputeHostUserMax() {
+	const auto limit = Common::HostUserAddressLimit();
+	if (limit == 0 || limit >= HOST_USER_MAX_CLASSIC + 1u + HOST_TOP_RESERVE_MIN) {
+		return HOST_USER_MAX_CLASSIC;
+	}
+	const auto reserve  = std::max(limit / 4u, HOST_TOP_RESERVE_MIN);
+	const auto user_end = limit > reserve ? (limit - reserve) & ~(0x40000000ull - 1u) : 0;
+	if (user_end <= HOST_USER_MIN) {
+		return HOST_USER_MAX_CLASSIC;
+	}
+	std::printf("[memory] host address space ends at 0x%llx: guest user window clipped to 0x%llx\n",
+	            static_cast<unsigned long long>(limit), static_cast<unsigned long long>(user_end - 1u));
+	return user_end - 1u;
+}
+
+static const uint64_t HOST_USER_MAX = ComputeHostUserMax();
 
 static bool GuestFreeRangeContains(uint64_t base, uint64_t range_size, uint64_t candidate,
                                    uint64_t size) {
