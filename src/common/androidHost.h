@@ -11,6 +11,7 @@
 #if KYTY_PLATFORM == KYTY_PLATFORM_LINUX && !defined(__APPLE__)
 #include <dlfcn.h>
 #include <time.h>
+#include <unistd.h>
 #define KYTY_ANDROID_HOST_REACHABLE 1
 #else
 #define KYTY_ANDROID_HOST_REACHABLE 0
@@ -48,6 +49,12 @@ inline bool AudioSelected() {
 	return selected;
 }
 
+// /dev/input is not readable by an app. The host pushes pad state down and this polls for it.
+inline bool InputSelected() {
+	static const bool selected = IsSelected("KYTY_HOST_INPUT");
+	return selected;
+}
+
 // WIDTHxHEIGHT of the host's surface, which only the host knows: it holds the ANativeWindow.
 inline bool WindowSize(uint32_t* width, uint32_t* height) {
 	const char* value = std::getenv("KYTY_HOST_WINDOW_SIZE");
@@ -59,6 +66,71 @@ inline bool WindowSize(uint32_t* width, uint32_t* height) {
 	*width  = w;
 	*height = h;
 	return true;
+}
+
+// --- the pad bridge ------------------------------------------------------------------------------
+//
+// A syscall with a magic number, answered by the host layer rather than forwarded to a kernel. The
+// wire format is versioned and size-checked by every read, because this struct and the host's live in
+// different repositories.
+
+struct PadWireState {
+	uint32_t buttons;
+	uint8_t  left_x; // 0..255, 128 centred, Y grows downward
+	uint8_t  left_y;
+	uint8_t  right_x;
+	uint8_t  right_y;
+	uint8_t  left_trigger; // 0..255
+	uint8_t  right_trigger;
+	uint8_t  connected;
+	uint8_t  reserved;
+};
+
+static_assert(sizeof(PadWireState) == 12);
+
+// The host's button numbering, which the bridge carries unchanged.
+enum PadWireButton : uint32_t {
+	PAD_WIRE_UP       = 1u << 0u,
+	PAD_WIRE_DOWN     = 1u << 1u,
+	PAD_WIRE_LEFT     = 1u << 2u,
+	PAD_WIRE_RIGHT    = 1u << 3u,
+	PAD_WIRE_CROSS    = 1u << 4u,
+	PAD_WIRE_CIRCLE   = 1u << 5u,
+	PAD_WIRE_SQUARE   = 1u << 6u,
+	PAD_WIRE_TRIANGLE = 1u << 7u,
+	PAD_WIRE_L1       = 1u << 8u,
+	PAD_WIRE_R1       = 1u << 9u,
+	PAD_WIRE_L2       = 1u << 10u,
+	PAD_WIRE_R2       = 1u << 11u,
+	PAD_WIRE_L3       = 1u << 12u,
+	PAD_WIRE_R3       = 1u << 13u,
+	PAD_WIRE_OPTIONS  = 1u << 14u,
+	PAD_WIRE_TOUCHPAD = 1u << 15u,
+};
+
+inline constexpr long     PAD_BRIDGE_MAGIC = 0x50440000;
+inline constexpr uint32_t PAD_WIRE_VERSION = 1;
+
+// 1 when a pad was written, 0 when there is none, negative when the host refused the read.
+inline long PadRead(PadWireState* state) {
+#if KYTY_ANDROID_HOST_REACHABLE
+	return ::syscall(PAD_BRIDGE_MAGIC | 0, static_cast<long>(PAD_WIRE_VERSION), state,
+	                 static_cast<long>(sizeof(*state)));
+#else
+	(void)state;
+	return -1;
+#endif
+}
+
+// Returns once the host has recorded the request; a host thread of its own delivers it.
+inline void PadRumble(uint8_t large_motor, uint8_t small_motor) {
+#if KYTY_ANDROID_HOST_REACHABLE
+	(void)::syscall(PAD_BRIDGE_MAGIC | 1, static_cast<long>(large_motor),
+	                static_cast<long>(small_motor));
+#else
+	(void)large_motor;
+	(void)small_motor;
+#endif
 }
 
 // --- AAudio --------------------------------------------------------------------------------------

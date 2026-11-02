@@ -1,5 +1,7 @@
 #include "libs/controller.h"
 
+#include "common/androidHost.h"
+
 #include <SDL3/SDL.h>
 #include "common/assert.h"
 #include "common/common.h"
@@ -844,7 +846,84 @@ static void StopHostPad(SDL_Gamepad* pad) {
 	(void)SDL_SetGamepadLED(pad, 0, 0, 0);
 }
 
+// The Android host's pad, polled from the host layer's bridge and applied to the keyboard's player
+// through the same router. Called before a read takes the lock, because applying goes through
+// Button and Axis, which take it too.
+static void PollAndroidHostPad() {
+	namespace Host = Common::AndroidHost;
+	if (!Host::InputSelected() || g_players[0] == nullptr) {
+		return;
+	}
+
+	static constexpr Host::PadWireState NEUTRAL {0, 128, 128, 128, 128, 0, 0, 0, 0};
+	static bool                         refused = false;
+	static Host::PadWireState           last    = NEUTRAL;
+	if (refused) {
+		return;
+	}
+
+	Host::PadWireState state {};
+	const auto         result = Host::PadRead(&state);
+	if (result < 0) {
+		// The host has said why on its own side. A wire mismatch does not repair itself mid-run.
+		refused = true;
+		return;
+	}
+	if (result == 0 || state.connected == 0) {
+		state = NEUTRAL;
+	}
+
+	struct ButtonMap {
+		uint32_t wire;
+		uint32_t pad;
+	};
+	static constexpr ButtonMap BUTTONS[] = {
+	    {Host::PAD_WIRE_UP, PAD_BUTTON_UP},         {Host::PAD_WIRE_DOWN, PAD_BUTTON_DOWN},
+	    {Host::PAD_WIRE_LEFT, PAD_BUTTON_LEFT},     {Host::PAD_WIRE_RIGHT, PAD_BUTTON_RIGHT},
+	    {Host::PAD_WIRE_CROSS, PAD_BUTTON_CROSS},   {Host::PAD_WIRE_CIRCLE, PAD_BUTTON_CIRCLE},
+	    {Host::PAD_WIRE_SQUARE, PAD_BUTTON_SQUARE}, {Host::PAD_WIRE_TRIANGLE, PAD_BUTTON_TRIANGLE},
+	    {Host::PAD_WIRE_L1, PAD_BUTTON_L1},         {Host::PAD_WIRE_R1, PAD_BUTTON_R1},
+	    {Host::PAD_WIRE_L3, PAD_BUTTON_L3},         {Host::PAD_WIRE_R3, PAD_BUTTON_R3},
+	    {Host::PAD_WIRE_OPTIONS, PAD_BUTTON_OPTIONS}, {Host::PAD_WIRE_TOUCHPAD, PAD_BUTTON_TOUCH_PAD},
+	};
+	const auto changed = state.buttons ^ last.buttons;
+	for (const auto& button: BUTTONS) {
+		if ((changed & button.wire) != 0) {
+			SetButton(HOST_INPUT_CONTROLLER_ID, button.pad, (state.buttons & button.wire) != 0);
+		}
+	}
+
+	// A trigger arrives as depth, as a button, or both; Axis presses L2/R2 for any depth.
+	const auto trigger = [](uint8_t depth, uint32_t buttons, uint32_t bit) {
+		return (buttons & bit) != 0 ? std::max<int>(depth, 255) : depth;
+	};
+	const auto update = [](Axis axis, int now, int before) {
+		if (now != before) {
+			SetAxis(HOST_INPUT_CONTROLLER_ID, axis, now);
+		}
+	};
+	update(Axis::LeftX, state.left_x, last.left_x);
+	update(Axis::LeftY, state.left_y, last.left_y);
+	update(Axis::RightX, state.right_x, last.right_x);
+	update(Axis::RightY, state.right_y, last.right_y);
+	update(Axis::TriggerLeft, trigger(state.left_trigger, state.buttons, Host::PAD_WIRE_L2),
+	       trigger(last.left_trigger, last.buttons, Host::PAD_WIRE_L2));
+	update(Axis::TriggerRight, trigger(state.right_trigger, state.buttons, Host::PAD_WIRE_R2),
+	       trigger(last.right_trigger, last.buttons, Host::PAD_WIRE_R2));
+
+	last = state;
+}
+
 void GameController::SetVibration(uint8_t large_motor, uint8_t small_motor) {
+	if (Common::AndroidHost::InputSelected()) {
+		// The host's one pad plays the keyboard's player, so only that player rumbles it. The host
+		// takes both levels and delivers them from a thread of its own.
+		if (m_player == KeyboardPlayer()) {
+			Common::AndroidHost::PadRumble(large_motor, small_motor);
+		}
+		return;
+	}
+
 	Common::LockGuard lock(m_mutex);
 	m_vibration       = {large_motor, small_motor};
 	m_vibration_until = SDL_GetTicks() + RUMBLE_DURATION_MS;
@@ -973,6 +1052,8 @@ void GameController::ReadState(ControllerState* state, bool* flag, int* count) {
 	EXIT_IF(count == nullptr);
 	EXIT_IF(state == nullptr);
 
+	PollAndroidHostPad();
+
 	Common::LockGuard lock(m_mutex);
 
 	*flag  = m_connected;
@@ -985,6 +1066,8 @@ int GameController::ReadStates(ControllerState* states, int states_num, bool* fl
 	EXIT_IF(count == nullptr);
 	EXIT_IF(states == nullptr);
 	EXIT_IF(states_num < 1 || states_num > STATES_MAX);
+
+	PollAndroidHostPad();
 
 	Common::LockGuard lock(m_mutex);
 
