@@ -1,5 +1,6 @@
 #include "libs/audio.h"
 
+#include "common/androidHost.h"
 #include "common/assert.h"
 #include "common/debugCounters.h"
 #include "common/emulatorConfig.h"
@@ -130,6 +131,9 @@ private:
 
 		SDL_AudioStream*                      stream  = nullptr;
 		Controller::DualSenseHaptics::Stream* haptics = nullptr;
+
+		// An AAudioStream*, standing in for the SDL stream when KYTY_HOST_AUDIO=android.
+		void* aaudio_stream = nullptr;
 	};
 
 	struct PortIn {
@@ -264,6 +268,20 @@ SDL_AudioFormat Audio::SdlFormat(Format format) {
 bool Audio::OpenSdlDevice(PortOut* port) {
 	EXIT_IF(port == nullptr);
 
+	if (Common::AndroidHost::AudioSelected()) {
+		// PrepareOutputBuffer already folds the guest layout into at most eight channels in SDL's
+		// order, which is also AAudio's 7.1 order, so what it produces plays unchanged.
+		port->aaudio_stream = Common::AndroidHost::AAudioOpenOutput(
+		    port->freq, OutputChannels(*port), FormatIsFloat(port->format));
+		if (port->aaudio_stream == nullptr) {
+			LOGF("AudioOut: AAudio stream could not be opened\n");
+			return false;
+		}
+		LOGF("AudioOut: opened AAudio stream (%u Hz, %u ch, %s)\n", port->freq,
+		     OutputChannels(*port), FormatIsFloat(port->format) ? "float" : "s16");
+		return true;
+	}
+
 	if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
 		LOGF("AudioOut: SDL audio init failed: %s\n", SDL_GetError());
 		return false;
@@ -296,6 +314,11 @@ void Audio::CloseSdlDevice(PortOut* port) {
 	EXIT_IF(port == nullptr);
 	Controller::DualSenseHaptics::Close(port->haptics);
 	port->haptics = nullptr;
+
+	if (port->aaudio_stream != nullptr) {
+		Common::AndroidHost::AAudioCloseOutput(port->aaudio_stream);
+		port->aaudio_stream = nullptr;
+	}
 
 	if (port->stream != nullptr) {
 		SDL_DestroyAudioStream(port->stream);
@@ -373,6 +396,16 @@ const void* Audio::PrepareOutputBuffer(const PortOut& port, const void* data,
 bool Audio::QueueSdlAudio(PortOut* port, const void* data, bool blocking, float gain,
                           const float* gains) {
 	EXIT_IF(port == nullptr);
+
+	if (port->aaudio_stream != nullptr && data != nullptr) {
+		// The write waits on the device itself, so the port is never primed and the batch is not
+		// paced by the sample clock on top of it.
+		std::vector<uint8_t> prepared_buffer;
+		const void* prepared = PrepareOutputBuffer(*port, data, &prepared_buffer, gain, gains);
+		return Common::AndroidHost::AAudioWrite(
+		    port->aaudio_stream, prepared, port->samples_num,
+		    BytesPerSample(port->format) * OutputChannels(*port), blocking);
+	}
 
 	if (port->stream == nullptr || data == nullptr) {
 		return false;
@@ -504,7 +537,9 @@ bool Audio::AudioOutHasDevice(Id handle) {
 	Common::LockGuard lock(m_mutex);
 
 	return (handle.GetId() >= 0 && handle.GetId() < OUT_PORTS_MAX &&
-	        m_out_ports[handle.GetId()].used && m_out_ports[handle.GetId()].stream != nullptr);
+	        m_out_ports[handle.GetId()].used &&
+	        (m_out_ports[handle.GetId()].stream != nullptr ||
+	         m_out_ports[handle.GetId()].aaudio_stream != nullptr));
 }
 
 bool Audio::AudioOutGetStatus(Id handle, int* type, int* channels_num) {
