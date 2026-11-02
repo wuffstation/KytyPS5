@@ -1,5 +1,6 @@
 ﻿#include "graphics/presentation/window.h"
 
+#include "common/androidHost.h"
 #include "common/assert.h"
 #include "common/common.h"
 #include "common/emulatorConfig.h"
@@ -789,6 +790,28 @@ static void WindowCreate(WindowContext& context) {
 		SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11,wayland");
 	}
 #endif
+
+	if (Common::AndroidHost::WindowSelected()) {
+		// No SDL window: Android has no display server SDL's Linux build can open, and the surface
+		// is the host's (see WindowContext::CreateVulkan). Events and the main-thread wakeups still
+		// go through SDL, which needs no video subsystem for either.
+		if (!SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_GAMEPAD)) {
+			EXIT("%s\n", SDL_GetError());
+		}
+		HostInputInit(nullptr);
+		InitializeSystemOverlayInput(nullptr);
+
+		uint32_t host_width  = 0;
+		uint32_t host_height = 0;
+		if (Common::AndroidHost::WindowSize(&host_width, &host_height)) {
+			context.graphic_ctx.screen_width  = host_width;
+			context.graphic_ctx.screen_height = host_height;
+		}
+		LOGF("WindowCreate(): Android host window (headless surface), %ux%u\n",
+		     context.graphic_ctx.screen_width, context.graphic_ctx.screen_height);
+		return;
+	}
+
 	if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
 		EXIT("%s\n", SDL_GetError());
 	}

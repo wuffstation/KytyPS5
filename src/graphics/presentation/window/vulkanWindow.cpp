@@ -1,3 +1,4 @@
+#include "common/androidHost.h"
 #include "common/assert.h"
 #include "common/common.h"
 #include "common/emulatorConfig.h"
@@ -774,13 +775,45 @@ static vk::Device VulkanCreateDevice(GraphicContext& graphics,
 	return device;
 }
 
-static void VulkanGetExtensions(VulkanExtensions& r) {
-	uint32_t required_extensions_count = 0;
+// The host layer's vkGetInstanceProcAddr, out of the guest-side libvulkan.so.1 it stages. SDL finds
+// the same library, but only from inside a video subsystem Android does not have.
+static PFN_vkGetInstanceProcAddr LoadAndroidHostVulkan() {
+#if KYTY_ANDROID_HOST_REACHABLE
+	void* library = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
+	if (library == nullptr) {
+		EXIT("Could not load libvulkan.so.1: %s\n", dlerror());
+	}
+	return reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(library, "vkGetInstanceProcAddr"));
+#else
+	return nullptr;
+#endif
+}
 
-	const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&required_extensions_count);
-	EXIT_NOT_IMPLEMENTED(extensions == nullptr);
-	EXIT_NOT_IMPLEMENTED(required_extensions_count == 0);
-	r.required_extensions.assign(extensions, extensions + required_extensions_count);
+// A surface with no window, which is what this process has. The host layer supplies
+// VK_EXT_headless_surface and backs it with a real surface on the app's ANativeWindow.
+static vk::SurfaceKHR::CType CreateAndroidHostSurface(vk::Instance instance) {
+	vk::HeadlessSurfaceCreateInfoEXT info {};
+	vk::SurfaceKHR                   surface {};
+	const auto result = instance.createHeadlessSurfaceEXT(&info, nullptr, &surface);
+	if (result != vk::Result::eSuccess) {
+		EXIT("vkCreateHeadlessSurfaceEXT failed: %s\n", vk::to_string(result).c_str());
+	}
+	return static_cast<vk::SurfaceKHR::CType>(surface);
+}
+
+static void VulkanGetExtensions(VulkanExtensions& r) {
+	if (Common::AndroidHost::WindowSelected()) {
+		// VK_KHR_surface is the host loader's own; VK_EXT_headless_surface is the host layer's.
+		r.required_extensions = {VK_KHR_SURFACE_EXTENSION_NAME,
+		                         VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME};
+	} else {
+		uint32_t required_extensions_count = 0;
+
+		const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&required_extensions_count);
+		EXIT_NOT_IMPLEMENTED(extensions == nullptr);
+		EXIT_NOT_IMPLEMENTED(required_extensions_count == 0);
+		r.required_extensions.assign(extensions, extensions + required_extensions_count);
+	}
 
 	r.available_extensions =
 	    EnumerateVulkan<vk::ExtensionProperties>( // @suppress("Ambiguous problem")
@@ -952,14 +985,17 @@ static void VulkanCheckInstanceVersion() {
 }
 
 void WindowContext::CreateVulkan() {
-	EXIT_IF(window == nullptr);
+	const bool android_host = Common::AndroidHost::WindowSelected();
+	EXIT_IF(window == nullptr && !android_host);
 	EXIT_IF(graphic_ctx.instance != nullptr);
 	EXIT_IF(graphic_ctx.physical_device != nullptr);
 	EXIT_IF(graphic_ctx.device != nullptr);
 	EXIT_IF(surface != nullptr);
 
 	auto get_instance_proc_addr =
-	    reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
+	    android_host
+	        ? LoadAndroidHostVulkan()
+	        : reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
 	if (get_instance_proc_addr == nullptr) {
 		EXIT("Could not load Vulkan: %s\n", SDL_GetError());
 	}
@@ -1056,8 +1092,11 @@ void WindowContext::CreateVulkan() {
 	}
 
 	vk::SurfaceKHR::CType native_surface = VK_NULL_HANDLE;
-	if (!SDL_Vulkan_CreateSurface(window, static_cast<vk::Instance::CType>(graphic_ctx.instance),
-	                              nullptr, &native_surface)) {
+	if (android_host) {
+		native_surface = CreateAndroidHostSurface(graphic_ctx.instance);
+	} else if (!SDL_Vulkan_CreateSurface(window,
+	                                     static_cast<vk::Instance::CType>(graphic_ctx.instance),
+	                                     nullptr, &native_surface)) {
 		EXIT("Could not create a Vulkan surface");
 	}
 	surface = native_surface;
@@ -1173,14 +1212,18 @@ void WindowContext::RefreshSurfaceCapabilities() {
 }
 
 void WindowContext::RecreateSurface() {
-	EXIT_IF(window == nullptr || graphic_ctx.instance == nullptr);
+	const bool android_host = Common::AndroidHost::WindowSelected();
+	EXIT_IF((window == nullptr && !android_host) || graphic_ctx.instance == nullptr);
 	if (surface != nullptr) {
 		graphic_ctx.instance.destroySurfaceKHR(surface, nullptr);
 		surface = nullptr;
 	}
 	vk::SurfaceKHR::CType native_surface = VK_NULL_HANDLE;
-	if (!SDL_Vulkan_CreateSurface(window, static_cast<vk::Instance::CType>(graphic_ctx.instance),
-	                              nullptr, &native_surface)) {
+	if (android_host) {
+		native_surface = CreateAndroidHostSurface(graphic_ctx.instance);
+	} else if (!SDL_Vulkan_CreateSurface(window,
+	                                     static_cast<vk::Instance::CType>(graphic_ctx.instance),
+	                                     nullptr, &native_surface)) {
 		EXIT("Could not recreate the Vulkan surface: %s\n", SDL_GetError());
 	}
 	surface = native_surface;

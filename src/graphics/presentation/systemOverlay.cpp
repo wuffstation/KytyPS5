@@ -655,8 +655,9 @@ void HideSplashScreen() {
 	g_splash_hidden_at.compare_exchange_strong(expected, Clock::now().time_since_epoch().count());
 }
 
+// window is null on a host with no SDL window (the Android host), which has no SDL text input
+// either; everything else here still applies.
 void InitializeSystemOverlayInput(SDL_Window* window) {
-	EXIT_IF(window == nullptr);
 	const Uint32 type = SDL_RegisterEvents(1);
 	EXIT_IF(type == static_cast<Uint32>(-1));
 	g_input_window = window;
@@ -736,7 +737,9 @@ bool ProcessSystemOverlayInput(const SDL_Event& event) {
 		g_input_controller      = update.capture_controller;
 		g_input_keyboard        = update.capture_keyboard;
 		g_input_multiline       = update.multiline;
-		if (update.text_input) {
+		if (g_input_window == nullptr) {
+			// no window to take text input for
+		} else if (update.text_input) {
 			SDL_StartTextInput(g_input_window);
 		} else if (SDL_TextInputActive(g_input_window)) {
 			SDL_StopTextInput(g_input_window);
