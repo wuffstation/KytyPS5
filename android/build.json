@@ -3,6 +3,7 @@
     "name": "Android platform support",
     "notes": "KytyPS5 expanded by Android platform support.",
     "hostSeams": ["window", "audio", "pad-1"],
+    "gameArchives": ["zar"],
     "env": {},
     "bootCheckpoints": [
         { "pattern": "Initialized: Config", "description": "Starting KytyPS5…" },
