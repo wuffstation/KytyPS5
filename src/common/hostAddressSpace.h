@@ -11,11 +11,11 @@ namespace Common {
 // The highest user address this process can map, as measured rather than assumed, or 0 when the
 // host cannot be asked.
 //
-// The fixed PS5 windows (user memory up to 0xFBFFFFFFFF, the host arena up to 0xFC00000000) fit
-// every x86-64 desktop, where user space is 47 bits. They do not fit an arm64 Linux kernel built
-// for a 39-bit VA, which gives a process 512 GiB: the common Android configuration, where the
-// Android host runs this build as guest code under FEXCore. The kernel places the process stack
-// just under that ceiling, so the highest mapping is the measurement.
+// The fixed PS5 user window, up to 0xFBFFFFFFFF, fits every x86-64 desktop, where user space is 47
+// bits. It does not fit an arm64 Linux kernel built for a 39-bit VA, which gives a process 512 GiB:
+// the common Android configuration, where the Android host runs this build as guest code under
+// FEXCore. The kernel places the process stack just under that ceiling, so the highest mapping is
+// the measurement.
 inline uint64_t HostUserAddressLimit() {
 #if KYTY_PLATFORM == KYTY_PLATFORM_LINUX && !defined(__APPLE__)
 	static const uint64_t limit = [] {
