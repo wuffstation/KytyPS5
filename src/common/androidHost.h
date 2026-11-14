@@ -157,6 +157,7 @@ struct AAudioApi {
 	void (*set_sharing_mode)(void* builder, int32_t mode)                = nullptr;
 	void (*set_performance_mode)(void* builder, int32_t mode)            = nullptr;
 	void (*set_usage)(void* builder, int32_t usage)                      = nullptr;
+	void (*set_buffer_capacity)(void* builder, int32_t frames)           = nullptr;
 	int32_t (*open_stream)(void* builder, void** stream)                 = nullptr;
 	int32_t (*delete_builder)(void* builder)                             = nullptr;
 	int32_t (*request_start)(void* stream)                               = nullptr;
@@ -195,6 +196,7 @@ inline const AAudioApi* GetAAudio() {
 		bind(resolved.set_sharing_mode, "AAudioStreamBuilder_setSharingMode");
 		bind(resolved.set_performance_mode, "AAudioStreamBuilder_setPerformanceMode");
 		bind(resolved.set_usage, "AAudioStreamBuilder_setUsage");
+		bind(resolved.set_buffer_capacity, "AAudioStreamBuilder_setBufferCapacityInFrames");
 		bind(resolved.open_stream, "AAudioStreamBuilder_openStream");
 		bind(resolved.delete_builder, "AAudioStreamBuilder_delete");
 		bind(resolved.request_start, "AAudioStream_requestStart");
@@ -233,6 +235,12 @@ inline void* AAudioOpenOutput(uint32_t sample_rate, uint32_t channels, bool is_f
 	api->set_sharing_mode(builder, AAUDIO_SHARING_MODE_SHARED);
 	api->set_performance_mode(builder, AAUDIO_PERFORMANCE_LOW_LATENCY);
 	api->set_usage(builder, AAUDIO_USAGE_GAME);
+	// The capacity is the most the buffer can ever hold, fixed when the stream opens. Left unasked,
+	// the device picks its own, 32 ms on some, which caps the buffer size set below.
+	const auto wanted = static_cast<int32_t>(sample_rate * latency_ms / 1000u);
+	if (wanted > 0) {
+		api->set_buffer_capacity(builder, wanted);
+	}
 	void*      stream = nullptr;
 	const auto status = api->open_stream(builder, &stream);
 	api->delete_builder(builder);
@@ -252,7 +260,6 @@ inline void* AAudioOpenOutput(uint32_t sample_rate, uint32_t channels, bool is_f
 		return nullptr;
 	}
 
-	const auto wanted   = static_cast<int32_t>(sample_rate * latency_ms / 1000u);
 	const auto capacity = api->get_buffer_capacity(stream);
 	if (wanted > 0 && capacity > 0) {
 		api->set_buffer_size(stream, wanted < capacity ? wanted : capacity);
