@@ -1,0 +1,293 @@
+// the settings rows a KytyPS5 build for android offers, drawn by the app on its PS5 emulator
+// screen and sent on every launch. the format is the app's docs/build-format.md. categories and
+// groups follow the launcher's configuration dialog (configuration_edit_dialog.ui); titles and
+// summaries start from its labels and tooltips. every row is a command line argument, as the
+// launcher passes them in CreateEmulatorArgs, and each id is the launcher's name for the setting.
+{
+  "version": 1,
+  "categories": [
+    {
+      "title": "User profile",
+      "icon": "icons/person.svg",
+      "rows": [
+        {
+          "id": "user_name",
+          "title": "User name",
+          "summary": "The local user name games see.",
+          "type": "string",
+          "control": "text",
+          "default": "Kyty",
+          // the payload refuses a longer name and exits (ParseArgs, MAX_USER_NAME_LENGTH)
+          "maxLength": 16,
+          "apply": { "arguments": ["--user-name", "{value}"] }
+        },
+        // no User ID row: saves are filed under the user id, so changing it hides every save
+        {
+          "id": "console_language",
+          "title": "Console language",
+          "summary": "The language the console reports to games.",
+          "type": "int",
+          "control": "dropdown",
+          "default": 1,
+          "options": [
+            { "value": 0, "label": "Japanese" },
+            { "value": 1, "label": "English (United States)" },
+            { "value": 2, "label": "French (France)" },
+            { "value": 3, "label": "Spanish (Spain)" },
+            { "value": 4, "label": "German" },
+            { "value": 5, "label": "Italian" },
+            { "value": 6, "label": "Dutch" },
+            { "value": 7, "label": "Portuguese (Portugal)" },
+            { "value": 8, "label": "Russian" },
+            { "value": 9, "label": "Korean" },
+            { "value": 10, "label": "Chinese (Traditional)" },
+            { "value": 11, "label": "Chinese (Simplified)" },
+            { "value": 12, "label": "Finnish" },
+            { "value": 13, "label": "Swedish" },
+            { "value": 14, "label": "Danish" },
+            { "value": 15, "label": "Norwegian" },
+            { "value": 16, "label": "Polish" },
+            { "value": 17, "label": "Portuguese (Brazil)" },
+            { "value": 18, "label": "English (United Kingdom)" },
+            { "value": 19, "label": "Turkish" },
+            { "value": 20, "label": "Spanish (Latin America)" },
+            { "value": 21, "label": "Arabic" },
+            { "value": 22, "label": "French (Canada)" },
+            { "value": 23, "label": "Czech" },
+            { "value": 24, "label": "Hungarian" },
+            { "value": 25, "label": "Greek" },
+            { "value": 26, "label": "Romanian" },
+            { "value": 27, "label": "Thai" },
+            { "value": 28, "label": "Vietnamese" },
+            { "value": 29, "label": "Indonesian" }
+          ],
+          "apply": { "arguments": ["--console-language", "{value}"] }
+        }
+      ]
+    },
+    {
+      "title": "General",
+      "icon": "icons/tune.svg",
+      "rows": [
+        {
+          "id": "pro_enabled",
+          "title": "PS5 Pro mode",
+          "summary": "Run games that support it in PS5 Pro mode. Experimental.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--trinity"], "sendAs": { "false": null } }
+        },
+        {
+          "id": "stretch_enabled",
+          "title": "Stretch to window",
+          "summary": "Stretch the game's image to fill the screen instead of keeping its aspect ratio with black bars.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--stretch"], "sendAs": { "false": null } }
+        },
+        {
+          "id": "skip_notice_screen",
+          "title": "Skip boot logos",
+          "summary": "Skip startup logos and notices in games that support it.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--skip-notice-screen"], "sendAs": { "false": null } }
+        },
+        // under Network in the launcher, which android leaves out: the signed in state it emulates
+        // needs no connection
+        {
+          "id": "psn_emulation_enabled",
+          "title": "Emulate PSN",
+          "summary": "Tell games you are signed in to PSN, for those that ask. Needs no connection.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--emulate-psn"], "sendAs": { "false": null } }
+        }
+        // no performance panel row: the app offers its own performance overlay for every emulator
+      ]
+    },
+    {
+      "title": "Graphics",
+      "icon": "icons/monitor.svg",
+      "rows": [
+        {
+          "id": "present_mode",
+          "title": "Present mode",
+          "summary": "How finished frames are handed to the screen.",
+          "type": "string",
+          "control": "dropdown",
+          "default": "Mailbox",
+          // no Immediate: the Odin's driver offers none, and KytyPS5 turns a mode the surface
+          // lacks into Fifo
+          "options": [
+            { "value": "Mailbox", "label": "Mailbox" },
+            { "value": "Fifo", "label": "Fifo" }
+          ],
+          "apply": { "arguments": ["--present-mode", "{value}"] }
+        },
+        {
+          "id": "vblank_frequency",
+          "title": "Vblank frequency",
+          "summary": "The refresh rate of the console's virtual display, which paces the game's frames.",
+          "type": "int",
+          "control": "text",
+          "default": 60,
+          "min": 30,
+          "max": 360,
+          "unit": "Hz",
+          "apply": { "arguments": ["--vblank-frequency", "{value}"] }
+        },
+        {
+          "id": "readback_linear_images",
+          "title": "Enable readback",
+          "summary": "Read back writable linear images.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--readback-linear-images"], "sendAs": { "false": null } }
+        },
+        {
+          "id": "readback_tiled_images",
+          "title": "Enable tiled readback",
+          "summary": "Read back small writable tiled images.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--readback-tiled-images"], "sendAs": { "false": null } }
+        },
+        {
+          "id": "readback_storage_images",
+          "title": "Enable storage readback",
+          "summary": "Read back shader-written images when the game flushes the GPU cache for the CPU. Images from linear and tiled readback are read back then too.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--readback-storage-images"], "sendAs": { "false": null } }
+        },
+        {
+          "id": "tessellation_enabled",
+          "title": "Enable tessellation support",
+          "summary": "Draw tessellated geometry. Experimental: unsupported tessellation may cause crashes.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--tessellation"], "sendAs": { "false": null } }
+        },
+        {
+          "id": "occlusion_queries_enabled",
+          "title": "Enable occlusion queries",
+          "summary": "Count the samples of occlusion queries on the GPU, so hidden lights and objects stay hidden. Costs some performance.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--occlusion-queries"], "sendAs": { "false": null } }
+        },
+        // no Cache shaders row: the flag governs only the .shaders files, and the release build
+        // keeps its pipeline cache whatever it says
+        {
+          "id": "relaxed_shader_float",
+          "title": "Relaxed shader float math",
+          "summary": "Use the GPU's native float operations in shaders. Faster, but can be inaccurate.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--relaxed-shader-float"], "sendAs": { "false": null } }
+        }
+      ]
+    },
+    {
+      "title": "Compatibility",
+      "icon": "icons/build.svg",
+      "rows": [
+        {
+          "id": "amd_cpu_enabled",
+          "title": "Intel CPU compatibility",
+          "summary": "Patch the CPU instructions that differ between AMD and the host CPU. Experimental.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--amd-cpu"], "sendAs": { "false": null } }
+        },
+        {
+          "id": "guest_tsc_enabled",
+          "title": "PS5 TSC rate",
+          "summary": "Run the CPU time stamp counter at the PS5's 1.6 GHz instead of the host's rate. Fixes games that run too fast. Experimental.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--guest-tsc"], "sendAs": { "false": null } }
+        }
+        // no red zone crash protection row: the linux payload has no --redzone
+      ]
+    },
+    {
+      "title": "Notifications",
+      "icon": "icons/emoji_events.svg",
+      "rows": [
+        {
+          "id": "trophy_enabled",
+          "title": "Enable trophy notifications",
+          "summary": "Show a notification when a trophy unlocks. On Android it plays no sound.",
+          "type": "bool",
+          "control": "toggle",
+          "default": true,
+          "apply": { "arguments": ["--no-trophy-notifications"], "sendAs": { "true": null } }
+        },
+        {
+          "id": "trophy_duration_seconds",
+          "title": "Trophy notification duration",
+          "summary": "How long each trophy notification stays on screen.",
+          "type": "int",
+          "control": "slider",
+          "default": 6,
+          "min": 5,
+          "max": 10,
+          "step": 1,
+          "unit": "s",
+          "shownWhen": { "row": "trophy_enabled", "equals": true },
+          "apply": { "arguments": ["--trophy-duration", "{value}"] }
+        }
+      ]
+    },
+    {
+      "title": "Debug",
+      "icon": "icons/bug_report.svg",
+      "groups": [
+        {
+          "title": "Rendering compatibility",
+          "rows": [
+            {
+              "id": "sync_raw_image_buffers",
+              "title": "Accurate texture synchronization",
+              "summary": "Can fix missing textures and incorrect transparency, at a slight performance cost.",
+              "type": "bool",
+              "control": "toggle",
+              "default": false,
+              "apply": { "arguments": ["--sync-raw-image-buffers"], "sendAs": { "false": null } }
+            }
+          ]
+        },
+        {
+          "title": "Performance tweaks",
+          "rows": [
+            {
+              "id": "flush_draws",
+              "title": "Submit GPU work every N draws",
+              "summary": "Can lower frame time in games that send a whole frame as one command buffer, at some submit overhead. 0 is off.",
+              "type": "int",
+              "control": "text",
+              "default": 0,
+              "min": 0,
+              "max": 99999,
+              "apply": { "arguments": ["--flush-draws", "{value}"] }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
