@@ -72,7 +72,7 @@
         {
           "id": "pro_enabled",
           "title": "PS5 Pro mode",
-          "summary": "Run games that support it in PS5 Pro mode. Experimental.",
+          "summary": "Run supported games in PS5 Pro mode. Experimental.",
           "type": "bool",
           "control": "toggle",
           "default": false,
@@ -81,7 +81,6 @@
         {
           "id": "stretch_enabled",
           "title": "Stretch to window",
-          "summary": "Stretch the game's image to fill the screen instead of keeping its aspect ratio with black bars.",
           "type": "bool",
           "control": "toggle",
           "default": false,
@@ -90,7 +89,7 @@
         {
           "id": "skip_notice_screen",
           "title": "Skip boot logos",
-          "summary": "Skip startup logos and notices in games that support it.",
+          "summary": "Skip startup logos and notices in supported games.",
           "type": "bool",
           "control": "toggle",
           "default": false,
@@ -101,7 +100,7 @@
         {
           "id": "psn_emulation_enabled",
           "title": "Emulate PSN",
-          "summary": "Tell games you are signed in to PSN, for those that ask. Needs no connection.",
+          "summary": "Tell games you are signed in to PSN if they ask. No internet connection needed.",
           "type": "bool",
           "control": "toggle",
           "default": false,
@@ -117,7 +116,6 @@
         {
           "id": "present_mode",
           "title": "Present mode",
-          "summary": "How finished frames are handed to the screen.",
           "type": "string",
           "control": "dropdown",
           "default": "Mailbox",
@@ -231,7 +229,7 @@
         {
           "id": "trophy_enabled",
           "title": "Enable trophy notifications",
-          "summary": "Show a notification when a trophy unlocks. On Android it plays no sound.",
+          "summary": "Show an overlay notification when you unlock a trophy.",
           "type": "bool",
           "control": "toggle",
           "default": true,
