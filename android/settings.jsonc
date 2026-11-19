@@ -94,17 +94,6 @@
           "control": "toggle",
           "default": false,
           "apply": { "arguments": ["--skip-notice-screen"], "sendAs": { "false": null } }
-        },
-        // under Network in the launcher, which android leaves out: the signed in state it emulates
-        // needs no connection
-        {
-          "id": "psn_emulation_enabled",
-          "title": "Emulate PSN",
-          "summary": "Tell games you are signed in to PSN if they ask. No internet connection needed.",
-          "type": "bool",
-          "control": "toggle",
-          "default": false,
-          "apply": { "arguments": ["--emulate-psn"], "sendAs": { "false": null } }
         }
         // no performance panel row: the app offers its own performance overlay for every emulator
       ]
@@ -220,6 +209,22 @@
           "apply": { "arguments": ["--guest-tsc"], "sendAs": { "false": null } }
         }
         // no red zone crash protection row: the linux payload has no --redzone
+      ]
+    },
+    {
+      "title": "Network",
+      "icon": "icons/language.svg",
+      "rows": [
+        // needs no connection
+        {
+          "id": "psn_emulation_enabled",
+          "title": "Emulate PSN",
+          "summary": "Tell games you are signed in to PSN if they ask. No internet connection needed.",
+          "type": "bool",
+          "control": "toggle",
+          "default": false,
+          "apply": { "arguments": ["--emulate-psn"], "sendAs": { "false": null } }
+        }
       ]
     },
     {
